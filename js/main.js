@@ -133,65 +133,75 @@ class DotLine {
         );
 
         if(endPoint && this.canConnect(this.selectedPoint, endPoint)) {
-            // Allow connection to the same point if it has available connections
-            if (endPoint === this.selectedPoint && endPoint.connections < 3) {
-                // Create a curved loop
-                const midPoint = new Point(
-                    this.currentPath[Math.floor(this.currentPath.length / 2)].x,
-                    this.currentPath[Math.floor(this.currentPath.length / 2)].y,
-                    2
-                );
+            let intersects = false;
+            for (const line of this.lines) {
+                if (this.linesIntersect(this.selectedPoint, endPoint, line.p1, line.p2)) {
+                    intersects = true;
+                    break;
+                }
+            }
 
-                this.lines.push({
-                    p1: this.selectedPoint,
-                    p2: midPoint,
-                    color: this.players[this.currentPlayer].color,
-                    path: this.currentPath.slice(0, Math.floor(this.currentPath.length / 2) + 1)
-                });
+            if (!intersects) {
+                // Allow connection to the same point if it has available connections
+                if (endPoint === this.selectedPoint && endPoint.connections < 3) {
+                    // Create a curved loop
+                    const midPoint = new Point(
+                        this.currentPath[Math.floor(this.currentPath.length / 2)].x,
+                        this.currentPath[Math.floor(this.currentPath.length / 2)].y,
+                        2
+                    );
 
-                this.lines.push({
-                    p1: midPoint,
-                    p2: endPoint,
-                    color: this.players[this.currentPlayer].color,
-                    path: this.currentPath.slice(Math.floor(this.currentPath.length / 2))
-                });
+                    this.lines.push({
+                        p1: this.selectedPoint,
+                        p2: midPoint,
+                        color: this.players[this.currentPlayer].color,
+                        path: this.currentPath.slice(0, Math.floor(this.currentPath.length / 2) + 1)
+                    });
 
-                this.selectedPoint.connections += 2;
-                if(this.selectedPoint.connections >= 3) this.selectedPoint.isDead = true;
-                if(midPoint.connections >= 3) midPoint.isDead = true;
+                    this.lines.push({
+                        p1: midPoint,
+                        p2: endPoint,
+                        color: this.players[this.currentPlayer].color,
+                        path: this.currentPath.slice(Math.floor(this.currentPath.length / 2))
+                    });
 
-                this.points.push(midPoint);
-                this.players[this.currentPlayer].score++;
-                this.nextTurn();
-            } else if (endPoint !== this.selectedPoint) {
-                // Original logic for connecting different points
-                const midIndex = Math.floor(this.currentPath.length / 2);
-                const midPoint = this.currentPath[midIndex];
-                const newPoint = new Point(midPoint.x, midPoint.y, 2);
+                    this.selectedPoint.connections += 2;
+                    if(this.selectedPoint.connections >= 3) this.selectedPoint.isDead = true;
+                    if(midPoint.connections >= 3) midPoint.isDead = true;
 
-                this.lines.push({
-                    p1: this.selectedPoint,
-                    p2: newPoint,
-                    color: this.players[this.currentPlayer].color,
-                    path: this.currentPath.slice(0, midIndex + 1)
-                });
+                    this.points.push(midPoint);
+                    this.players[this.currentPlayer].score++;
+                    this.nextTurn();
+                } else if (endPoint !== this.selectedPoint) {
+                    // Original logic for connecting different points
+                    const midIndex = Math.floor(this.currentPath.length / 2);
+                    const midPoint = this.currentPath[midIndex];
+                    const newPoint = new Point(midPoint.x, midPoint.y, 2);
 
-                this.lines.push({
-                    p1: newPoint,
-                    p2: endPoint,
-                    color: this.players[this.currentPlayer].color,
-                    path: this.currentPath.slice(midIndex)
-                });
+                    this.lines.push({
+                        p1: this.selectedPoint,
+                        p2: newPoint,
+                        color: this.players[this.currentPlayer].color,
+                        path: this.currentPath.slice(0, midIndex + 1)
+                    });
 
-                this.selectedPoint.connections++;
-                endPoint.connections++;
-                if(this.selectedPoint.connections >= 3) this.selectedPoint.isDead = true;
-                if(endPoint.connections >= 3) endPoint.isDead = true;
-                if(newPoint.connections >= 3) newPoint.isDead = true;
+                    this.lines.push({
+                        p1: newPoint,
+                        p2: endPoint,
+                        color: this.players[this.currentPlayer].color,
+                        path: this.currentPath.slice(midIndex)
+                    });
 
-                this.points.push(newPoint);
-                this.players[this.currentPlayer].score++;
-                this.nextTurn();
+                    this.selectedPoint.connections++;
+                    endPoint.connections++;
+                    if(this.selectedPoint.connections >= 3) this.selectedPoint.isDead = true;
+                    if(endPoint.connections >= 3) endPoint.isDead = true;
+                    if(newPoint.connections >= 3) newPoint.isDead = true;
+
+                    this.points.push(newPoint);
+                    this.players[this.currentPlayer].score++;
+                    this.nextTurn();
+                }
             }
         }
 
@@ -220,6 +230,41 @@ class DotLine {
         if(p1.isDead || p2.isDead) return false;
         if(p1 === p2) return p1.connections < 3; // Allow self-connection if connections available
         return p1.connections < 3 && p2.connections < 3;
+    }
+
+    orientation(p, q, r) {
+        const val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+        if (val === 0) return 0; // Collinear
+        return (val > 0) ? 1 : 2; // Clockwise or Counterclockwise
+    }
+
+    onSegment(p, q, r) {
+        return (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) &&
+            q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y));
+    }
+
+    linesIntersect(p1, q1, p2, q2) {
+        // Don't count intersection if the lines share an endpoint
+        if (p1 === p2 || p1 === q2 || q1 === p2 || q1 === q2) {
+            return false;
+        }
+
+        const o1 = this.orientation(p1, q1, p2);
+        const o2 = this.orientation(p1, q1, q2);
+        const o3 = this.orientation(p2, q2, p1);
+        const o4 = this.orientation(p2, q2, q1);
+
+        if (o1 !== o2 && o3 !== o4) {
+            return true;
+        }
+
+        // Special Cases for collinear points
+        if (o1 === 0 && this.onSegment(p1, p2, q1)) return true;
+        if (o2 === 0 && this.onSegment(p1, q2, q1)) return true;
+        if (o3 === 0 && this.onSegment(p2, p1, q2)) return true;
+        if (o4 === 0 && this.onSegment(p2, q1, q2)) return true;
+
+        return false;
     }
 
     draw() {

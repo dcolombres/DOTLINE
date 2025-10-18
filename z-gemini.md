@@ -37,6 +37,17 @@ Construir una aplicación completa y atractiva para que los usuarios puedan apre
 |-- z-gemini.md
 ```
 
+## Reglas del Juego
+- **Jugadores:** 2 a 4 jugadores.
+- **Inicio:** El juego comienza con un número de puntos (entre 3 y 10) distribuidos aleatoriamente en el tablero.
+- **Turnos:** Los jugadores se turnan para dibujar una línea entre dos puntos.
+- **Puntuación:** Cada línea dibujada otorga 1 punto al jugador.
+- **Conexiones:** Un punto puede tener un máximo de 3 conexiones. Una vez que un punto alcanza las 3 conexiones, se considera "muerto" y no puede ser utilizado para nuevas conexiones.
+- **Autoconexión (Loops):** Un jugador puede dibujar una línea desde un punto de vuelta a sí mismo, creando un "loop". Esto cuenta como un movimiento, otorga un punto y utiliza 2 de las 3 conexiones de ese punto.
+- **Intersecciones:** Las líneas no pueden cruzarse entre sí. Un movimiento que resulte en una intersección no es válido.
+- **Fin del juego:** El juego termina cuando no es posible realizar más conexiones válidas en el tablero.
+- **Ganador:** El jugador con la mayor cantidad de puntos al final del juego es el ganador.
+
 ## Estilo de Código y Convenciones
 
 ### JavaScript
