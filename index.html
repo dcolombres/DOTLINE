@@ -3,13 +3,27 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<div class="controls">
-    <button id="newGame">New Game</button>
-    <input type="number" id="playerCount" min="2" max="4" value="2"> Players
-    <input type="number" id="initialPoints" min="3" max="10" value="5"> Points
+<div class="main-container">
+    <div class="left-panel">
+        <div class="controls">
+            <button id="newGame">New Game</button>
+            <input type="number" id="playerCount" min="2" max="4" value="2"> Players
+            <input type="number" id="initialPoints" min="3" max="10" value="3"> Points
+            <select id="gameMode">
+                <option value="pve_easy">Player vs. AI (Easy)</option>
+                <option value="pve_hard">Player vs. AI (Normal)</option>
+                <option value="pvp">Player vs. Player</option>
+            </select>
+        </div>
+        <div id="playerInfo" class="player-info"></div>
+    </div>
+    <div class="center-panel">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <div class="right-panel">
+        <div id="message-console"></div>
+    </div>
 </div>
-<div id="playerInfo" class="player-info"></div>
-<canvas id="gameCanvas"></canvas>
 
 <script src="js/main.js"></script>
 </body></html>
