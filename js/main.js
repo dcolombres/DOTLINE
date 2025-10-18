@@ -571,3 +571,18 @@ document.getElementById('newGame').addEventListener('click', () => {
 
 // Start initial game
 game.initGame(2, 5);
+
+const gameModeSelect = document.getElementById('gameMode');
+const playerCountInput = document.getElementById('playerCount');
+
+gameModeSelect.addEventListener('change', () => {
+    if (gameModeSelect.value !== 'pvp') {
+        playerCountInput.value = 2;
+        playerCountInput.disabled = true;
+    } else {
+        playerCountInput.disabled = false;
+    }
+});
+
+// Trigger the change event on page load to set the initial state
+gameModeSelect.dispatchEvent(new Event('change'));
