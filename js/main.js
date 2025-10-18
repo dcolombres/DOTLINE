@@ -182,6 +182,10 @@ class DotLine {
 
     initGame(playerCount, initialPoints) {
         this.gameMode = document.getElementById('gameMode').value;
+        if (this.gameMode !== 'pvp') {
+            playerCount = 2;
+        }
+
         this.points = [];
         this.lines = [];
         this.animatingLines = [];
@@ -193,7 +197,7 @@ class DotLine {
         
         // Initialize players with colors
         this.players = [];
-        const colors = ['#00ff9d', '#00a1ff', '#ff3366', '#ff9900'];
+        const colors = ['#00ff9d', '#ff9900', '#00a1ff', '#ff3366'];
         for(let i = 0; i < playerCount; i++) {
             this.players.push({
                 color: colors[i],
