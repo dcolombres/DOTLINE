@@ -19,6 +19,8 @@ class DotLine {
         this.players = [];
         this.gameOver = false;
         this.isDrawing = false;
+        this.isAiTurn = false;
+        this.gameReady = false;
         this.currentPath = [];
 
         this.resizeCanvas();
@@ -55,7 +57,7 @@ class DotLine {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw grid (optional futuristic background)
+        // Draw grid
         this.ctx.strokeStyle = '#222';
         this.ctx.lineWidth = 0.5;
         for(let i = 0; i < this.canvas.width; i += 40) {
@@ -88,20 +90,16 @@ class DotLine {
             this.ctx.beginPath();
             this.ctx.strokeStyle = line.color;
             this.ctx.lineWidth = 2;
-
             const totalLength = line.path.length - 1;
             const currentLength = totalLength * line.progress;
-            
             for (let i = 0; i < Math.floor(currentLength); i++) {
                 this.ctx.moveTo(line.path[i].x, line.path[i].y);
                 this.ctx.lineTo(line.path[i+1].x, line.path[i+1].y);
             }
-
             const lastSegmentIndex = Math.floor(currentLength);
             const lastSegmentProgress = currentLength - lastSegmentIndex;
             const p1 = line.path[lastSegmentIndex];
             const p2 = line.path[lastSegmentIndex + 1];
-
             if (p1 && p2) {
                 const x = p1.x + (p2.x - p1.x) * lastSegmentProgress;
                 const y = p1.y + (p2.y - p1.y) * lastSegmentProgress;
@@ -113,12 +111,10 @@ class DotLine {
 
         // Draw lines with glow effect
         for(const line of this.lines) {
-            // Glow effect
             this.ctx.shadowBlur = 10;
             this.ctx.shadowColor = line.color;
-            
             this.ctx.beginPath();
-            if(line.path && line.path.length > 1) {
+            if (line.path && line.path.length > 2) {
                 const startPoint = line.path[0];
                 const endPoint = line.path[line.path.length - 1];
                 const controlPoint = line.path[Math.floor(line.path.length / 2)];
@@ -135,10 +131,23 @@ class DotLine {
         
         this.ctx.shadowBlur = 0;
 
-        // Draw points with futuristic style
+        // Draw points
         for(const point of this.points) {
+            if (point.connections >= 3 && !point.isDead) {
+                point.isDying = true;
+            }
+
+            let pointColor = '#fff';
+            switch (point.connections) {
+                case 1:
+                    pointColor = '#ffd700'; // Yellow
+                    break;
+                case 2:
+                    pointColor = '#ff0000'; // Red
+                    break;
+            }
+
             if (point.isDying) {
-                // Draw dying animation
                 this.ctx.beginPath();
                 this.ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
@@ -146,16 +155,14 @@ class DotLine {
                 point.isDead = true;
                 point.isDying = false;
             } else if (!point.isDead) {
-                // Outer glow
                 this.ctx.beginPath();
                 this.ctx.arc(point.x, point.y, 8, 0, Math.PI * 2);
                 this.ctx.fillStyle = '#222';
                 this.ctx.fill();
                 
-                // Inner point
                 this.ctx.beginPath();
                 this.ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
-                this.ctx.fillStyle = '#fff';
+                this.ctx.fillStyle = pointColor;
                 this.ctx.fill();
 
                 if(point === this.selectedPoint) {
@@ -166,10 +173,9 @@ class DotLine {
                     this.ctx.stroke();
                 }
             } else {
-                // Draw dead point
                 this.ctx.beginPath();
                 this.ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
-                this.ctx.fillStyle = '#333';
+                this.ctx.fillStyle = '#666';
                 this.ctx.fill();
             }
         }
@@ -181,6 +187,7 @@ class DotLine {
     }
 
     initGame(playerCount, initialPoints) {
+        this.gameReady = false;
         this.gameMode = document.getElementById('gameMode').value;
         if (this.gameMode !== 'pvp') {
             playerCount = 2;
@@ -193,23 +200,24 @@ class DotLine {
         this.currentPlayer = 0;
         this.gameOver = false;
         this.isDrawing = false;
+        this.isAiTurn = false;
         this.currentPath = [];
         
-        // Initialize players with colors
+        const playerName = document.getElementById('playerName').value || 'Jugador';
         this.players = [];
         const colors = ['#00ff9d', '#ff9900', '#00a1ff', '#ff3366'];
         for(let i = 0; i < playerCount; i++) {
+            const isAi = this.gameMode !== 'pvp' && i === 1;
             this.players.push({
+                name: isAi ? 'MIA' : playerName,
                 color: colors[i],
                 score: 0,
-                loopCredits: 0,
-                isAi: this.gameMode !== 'pvp' && i === 1 // AI is always player 2 in PvE mode
+                isAi: isAi
             });
         }
 
-        this.logMessage(`New game started with ${playerCount} players.`);
+        this.logMessage(`Nueva partida iniciada con ${playerCount} jugadores.`);
 
-        // Create initial random points
         for(let i = 0; i < initialPoints; i++) {
             this.points.push(new Point(
                 Math.random() * (this.canvas.width - 100) + 50,
@@ -220,6 +228,7 @@ class DotLine {
         this.updatePlayerInfo();
         this.resizeCanvas();
         this.render();
+        this.gameReady = true;
     }
 
     updatePlayerInfo() {
@@ -229,9 +238,13 @@ class DotLine {
             const div = document.createElement('div');
             div.className = `player ${index === this.currentPlayer ? 'active' : ''}`;
             div.style.backgroundColor = player.color + '40';
-            div.textContent = `Player ${index + 1}: ${player.score} (Loops: ${player.loopCredits})`;
+            div.textContent = `${player.name}: ${player.score}`;
             container.appendChild(div);
         });
+    }
+
+    getPlayerName(playerIndex) {
+        return this.players[playerIndex].name;
     }
 
     getEventCoordinates(e) {
@@ -249,7 +262,7 @@ class DotLine {
     }
 
     handleMouseDown(e) {
-        if(this.gameOver) return;
+        if (!this.gameReady || this.gameOver || this.isAiTurn) return;
         const coords = this.getEventCoordinates(e);
         const clickedPoint = this.points.find(p => 
             Math.hypot(p.x - coords.x, p.y - coords.y) < 10 && !p.isDead
@@ -276,7 +289,9 @@ class DotLine {
             !p.isDead
         );
 
-        this.executeMove(this.selectedPoint, endPoint);
+        if (this.executeMove(this.selectedPoint, endPoint)) {
+            this.nextTurn();
+        }
 
         this.isDrawing = false;
         this.selectedPoint = null;
@@ -287,63 +302,36 @@ class DotLine {
         if(endPoint && this.canConnect(startPoint, endPoint)) {
             let intersects = false;
             for (const line of this.lines) {
-                if (this.linesIntersect(startPoint, endPoint, line.p1, line.p2)) {
-                    intersects = true;
-                    break;
+                if (line.path && line.path.length > 1) {
+                    for (let k = 0; k < line.path.length - 1; k++) {
+                        const segmentStart = line.path[k];
+                        const segmentEnd = line.path[k+1];
+
+                        // Ignore segments that are very close to the start point of the new line
+                        const dist1 = Math.hypot(startPoint.x - segmentStart.x, startPoint.y - segmentStart.y);
+                        const dist2 = Math.hypot(startPoint.x - segmentEnd.x, startPoint.y - segmentEnd.y);
+                        if (dist1 < 10 || dist2 < 10) {
+                            continue; // Skip this segment
+                        }
+
+                        if (this.linesIntersect(startPoint, endPoint, segmentStart, segmentEnd)) {
+                            intersects = true;
+                            break;
+                        }
+                    }
+                } else {
+                    if (this.linesIntersect(startPoint, endPoint, line.p1, line.p2)) {
+                        intersects = true;
+                    }
                 }
+                if (intersects) break;
             }
 
             if (!intersects) {
-                // Allow connection to the same point if it has available connections
-                if (endPoint === startPoint && endPoint.connections < 3) {
-                    if (this.players[this.currentPlayer].loopCredits > 0) {
-                        this.players[this.currentPlayer].loopCredits--;
-                        // Create a curved loop
-                        const midPoint = new Point(
-                            this.currentPath[Math.floor(this.currentPath.length / 2)].x,
-                            this.currentPath[Math.floor(this.currentPath.length / 2)].y,
-                            2
-                        );
-
-                        this.animatingLines.push({
-                            p1: startPoint,
-                            p2: midPoint,
-                            color: this.players[this.currentPlayer].color,
-                            path: this.currentPath.slice(0, Math.floor(this.currentPath.length / 2) + 1),
-                            progress: 0,
-                            speed: 0.05
-                        });
-
-                        this.animatingLines.push({
-                            p1: midPoint,
-                            p2: endPoint,
-                            color: this.players[this.currentPlayer].color,
-                            path: this.currentPath.slice(Math.floor(this.currentPath.length / 2)),
-                            progress: 0,
-                            speed: 0.05
-                        });
-
-                        startPoint.connections += 2;
-                        if(startPoint.connections >= 3) {
-                            startPoint.isDying = true;
-                            this.logMessage('A point has been closed!');
-                        }
-                        if(midPoint.connections >= 3) midPoint.isDying = true;
-
-                        this.points.push(midPoint);
-                        this.players[this.currentPlayer].score++;
-                        this.logMessage(`Player ${this.currentPlayer + 1} scored a point!`, this.players[this.currentPlayer].color);
-                        this.nextTurn();
-                    } else {
-                        this.triggerInvalidMoveAnimation();
-                        this.logMessage('Not enough loop credits.', '#ff6b6b');
-                    }
-                } else if (endPoint !== startPoint) {
-                    // Original logic for connecting different points
+                if (endPoint !== startPoint) {
                     const midIndex = Math.floor(this.currentPath.length / 2);
                     const midPoint = this.currentPath[midIndex];
                     const newPoint = new Point(midPoint.x, midPoint.y, 2);
-
                     this.animatingLines.push({
                         p1: startPoint,
                         p2: newPoint,
@@ -352,7 +340,6 @@ class DotLine {
                         progress: 0,
                         speed: 0.05
                     });
-
                     this.animatingLines.push({
                         p1: newPoint,
                         p2: endPoint,
@@ -361,7 +348,6 @@ class DotLine {
                         progress: 0,
                         speed: 0.05
                     });
-
                     startPoint.connections++;
                     endPoint.connections++;
                     let pointDied = false;
@@ -378,28 +364,25 @@ class DotLine {
                         pointDied = true;
                     }
                     if (pointDied) {
-                        this.logMessage('A point has been closed!');
+                        this.logMessage('¡Un punto ha sido cerrado!');
                     }
 
                     this.points.push(newPoint);
                     this.players[this.currentPlayer].score++;
-                    this.logMessage(`Player ${this.currentPlayer + 1} scored a point!`, this.players[this.currentPlayer].color);
-
-                    const newScore = this.players[this.currentPlayer].score;
-                    if (newScore > 0 && newScore % 3 === 0) {
-                        this.players[this.currentPlayer].loopCredits++;
-                        this.logMessage(`Player ${this.currentPlayer + 1} earned a loop credit!`, this.players[this.currentPlayer].color);
-                    }
-                    this.nextTurn();
+                    this.logMessage(`${this.getPlayerName(this.currentPlayer)} anotó un punto!`, this.players[this.currentPlayer].color);
+                    return true;
                 }
             } else {
                 this.triggerInvalidMoveAnimation();
-                this.logMessage('Invalid move: Lines cannot cross.', '#ff6b6b');
+                this.logMessage('Movimiento inválido: Las líneas no pueden cruzarse.', '#ff6b6b');
+                return false;
             }
         } else if (this.isDrawing) {
             this.triggerInvalidMoveAnimation();
-            this.logMessage('Invalid move.', '#ff6b6b');
+            this.logMessage('Movimiento inválido.', '#ff6b6b');
+            return false;
         }
+        return false;
     }
 
     handleTouchStart(e) {
@@ -419,15 +402,15 @@ class DotLine {
 
     canConnect(p1, p2) {
         if(p1.isDead || p2.isDead) return false;
-        if(p1 === p2) return p1.connections < 3; // Allow self-connection if connections available
+        if(p1 === p2) return false; // Disallow self-connection
         return p1.connections < 3 && p2.connections < 3;
     }
 
     orientation(p, q, r) {
         const val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
         const epsilon = 1e-10;
-        if (Math.abs(val) < epsilon) return 0; // Collinear
-        return (val > 0) ? 1 : 2; // Clockwise or Counterclockwise
+        if (Math.abs(val) < epsilon) return 0;
+        return (val > 0) ? 1 : 2;
     }
 
     onSegment(p, q, r) {
@@ -436,8 +419,14 @@ class DotLine {
     }
 
     linesIntersect(p1, q1, p2, q2) {
-        // Don't count intersection if the lines share an endpoint
-        if (p1 === p2 || p1 === q2 || q1 === p2 || q1 === q2) {
+        const epsilon = 1e-5;
+        const pointsShareEndpoint = 
+            (Math.abs(p1.x - p2.x) < epsilon && Math.abs(p1.y - p2.y) < epsilon) ||
+            (Math.abs(p1.x - q2.x) < epsilon && Math.abs(p1.y - q2.y) < epsilon) ||
+            (Math.abs(q1.x - p2.x) < epsilon && Math.abs(q1.y - p2.y) < epsilon) ||
+            (Math.abs(q1.x - q2.x) < epsilon && Math.abs(q1.y - q2.y) < epsilon);
+
+        if (pointsShareEndpoint) {
             return false;
         }
 
@@ -449,12 +438,6 @@ class DotLine {
         if (o1 !== o2 && o3 !== o4) {
             return true;
         }
-
-        // Special Cases for collinear points
-        if (o1 === 0 && this.onSegment(p1, p2, q1)) return true;
-        if (o2 === 0 && this.onSegment(p1, q2, q1)) return true;
-        if (o3 === 0 && this.onSegment(p2, p1, q2)) return true;
-        if (o4 === 0 && this.onSegment(p2, q1, q2)) return true;
 
         return false;
     }
@@ -481,18 +464,20 @@ class DotLine {
     nextTurn() {
         this.currentPlayer = (this.currentPlayer + 1) % this.players.length;
         this.updatePlayerInfo();
-        this.logMessage(`Player ${this.currentPlayer + 1}'s turn.`, this.players[this.currentPlayer].color);
+        this.logMessage(`Es el turno de ${this.getPlayerName(this.currentPlayer)}.`, this.players[this.currentPlayer].color);
         
-        // Check if game is over
         this.gameOver = !this.hasValidMoves();
         if(this.gameOver) {
             const winner = this.players.reduce((prev, curr, idx) => 
                 curr.score > prev.score ? {score: curr.score, index: idx} : prev,
                 {score: -1, index: -1}
             );
-            this.logMessage(`Game Over! Player ${winner.index + 1} wins with ${winner.score} points!`, '#00ff9d');
+            this.logMessage(`¡Fin del juego! ${this.getPlayerName(winner.index)} gana con ${winner.score} puntos!`, '#00ff9d');
         } else if (this.players[this.currentPlayer].isAi) {
+            this.isAiTurn = true;
             setTimeout(() => this.makeAiMove(), 1000);
+        } else {
+            this.isAiTurn = false;
         }
     }
 
@@ -504,16 +489,15 @@ class DotLine {
         const validMoves = this.getAllValidMoves();
 
         if (validMoves.length === 0) {
-            return; // No moves left
+            this.nextTurn();
+            return;
         }
 
         let chosenMove;
 
         if (this.gameMode === 'pve_easy') {
-            // Easy AI: pick a random move
             chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
         } else if (this.gameMode === 'pve_hard') {
-            // Normal AI: "Careful" logic
             const safeMoves = validMoves.filter(move => {
                 const p1_isSafe = move.p1.connections !== 1;
                 const p2_isSafe = move.p2.connections !== 1;
@@ -528,26 +512,47 @@ class DotLine {
         }
 
         if (chosenMove) {
-            // For AI moves, the path is a straight line
             this.currentPath = [chosenMove.p1, chosenMove.p2];
-            this.executeMove(chosenMove.p1, chosenMove.p2);
+            if (this.executeMove(chosenMove.p1, chosenMove.p2)) {
+                this.nextTurn();
+            }
         }
     }
 
     getAllValidMoves() {
         const validMoves = [];
         for (let i = 0; i < this.points.length; i++) {
-            for (let j = i; j < this.points.length; j++) {
+            for (let j = i + 1; j < this.points.length; j++) {
                 const p1 = this.points[i];
                 const p2 = this.points[j];
 
                 if (this.canConnect(p1, p2)) {
                     let intersects = false;
                     for (const line of this.lines) {
-                        if (this.linesIntersect(p1, p2, line.p1, line.p2)) {
-                            intersects = true;
-                            break;
+                        if (line.path && line.path.length > 1) {
+                            for (let k = 0; k < line.path.length - 1; k++) {
+                                const segmentStart = line.path[k];
+                                const segmentEnd = line.path[k+1];
+
+                                // Ignore segments that are very close to the start point of the new line
+                                const dist1 = Math.hypot(p1.x - segmentStart.x, p1.y - segmentStart.y);
+                                const dist2 = Math.hypot(p1.x - segmentEnd.x, p1.y - segmentEnd.y);
+                                if (dist1 < 10 || dist2 < 10) {
+                                    continue; // Skip this segment
+                                }
+
+                                if (this.linesIntersect(p1, p2, segmentStart, segmentEnd)) {
+                                    intersects = true;
+                                    break;
+                                }
+                            }
+                        } else {
+                            if (this.linesIntersect(p1, p2, line.p1, line.p2)) {
+                                this.logMessage(`DEBUG: Intersection discarded move (${p1.x.toFixed(2)},${p1.y.toFixed(2)}) [${p1.connections}] -> (${p2.x.toFixed(2)},${p2.y.toFixed(2)}) [${p2.connections}]`, '#f0f');
+                                intersects = true;
+                            }
                         }
+                        if (intersects) break;
                     }
                     if (!intersects) {
                         validMoves.push({ p1, p2 });
@@ -563,26 +568,35 @@ class DotLine {
 const canvas = document.getElementById('gameCanvas');
 const game = new DotLine(canvas);
 
-document.getElementById('newGame').addEventListener('click', () => {
-    const playerCount = parseInt(document.getElementById('playerCount').value);
-    const initialPoints = parseInt(document.getElementById('initialPoints').value);
-    game.initGame(playerCount, initialPoints);
-});
-
-// Start initial game
-game.initGame(2, 5);
-
 const gameModeSelect = document.getElementById('gameMode');
 const playerCountInput = document.getElementById('playerCount');
+const playerNameContainer = document.getElementById('playerNameContainer');
+const playerCountContainer = document.getElementById('playerCountContainer');
+
+function startGame() {
+    const consoleElement = document.getElementById('message-console');
+    consoleElement.innerHTML = '';
+
+    const playerCount = parseInt(playerCountInput.value);
+    const initialPoints = parseInt(document.getElementById('initialPoints').value);
+    game.initGame(playerCount, initialPoints);
+}
+
+document.getElementById('newGame').addEventListener('click', startGame);
 
 gameModeSelect.addEventListener('change', () => {
     if (gameModeSelect.value !== 'pvp') {
         playerCountInput.value = 2;
         playerCountInput.disabled = true;
+        playerNameContainer.style.display = 'flex';
+        playerCountContainer.style.display = 'none';
     } else {
         playerCountInput.disabled = false;
+        playerNameContainer.style.display = 'none';
+        playerCountContainer.style.display = 'flex';
     }
 });
 
-// Trigger the change event on page load to set the initial state
+// Initial setup
 gameModeSelect.dispatchEvent(new Event('change'));
+startGame();
