@@ -421,7 +421,8 @@ class DotLine {
 
     orientation(p, q, r) {
         const val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
-        if (val === 0) return 0; // Collinear
+        const epsilon = 1e-10;
+        if (Math.abs(val) < epsilon) return 0; // Collinear
         return (val > 0) ? 1 : 2; // Clockwise or Counterclockwise
     }
 
