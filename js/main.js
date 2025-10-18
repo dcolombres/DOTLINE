@@ -19,10 +19,22 @@ class DotLine {
         this.gameOver = false;
         this.isDrawing = false;
         this.currentPath = [];
+
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
         
         this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e));
+        this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e));
+        this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+    }
+
+    resizeCanvas() {
+        this.canvas.width = this.canvas.clientWidth;
+        this.canvas.height = this.canvas.clientHeight;
+        this.draw();
     }
 
     initGame(playerCount, initialPoints) {
@@ -52,7 +64,7 @@ class DotLine {
         }
 
         this.updatePlayerInfo();
-        this.draw();
+        this.resizeCanvas();
     }
 
     updatePlayerInfo() {
@@ -67,15 +79,25 @@ class DotLine {
         });
     }
 
+    getEventCoordinates(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        if (e.touches) {
+            return {
+                x: e.touches[0].clientX - rect.left,
+                y: e.touches[0].clientY - rect.top
+            };
+        }
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    }
+
     handleMouseDown(e) {
         if(this.gameOver) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
+        const coords = this.getEventCoordinates(e);
         const clickedPoint = this.points.find(p => 
-            Math.hypot(p.x - x, p.y - y) < 10 && !p.isDead
+            Math.hypot(p.x - coords.x, p.y - coords.y) < 10 && !p.isDead
         );
 
         if(clickedPoint) {
@@ -87,12 +109,8 @@ class DotLine {
 
     handleMouseMove(e) {
         if(!this.isDrawing || !this.selectedPoint) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        this.currentPath.push({x, y});
+        const coords = this.getEventCoordinates(e);
+        this.currentPath.push({x: coords.x, y: coords.y});
         this.draw();
         
         // Draw current path
@@ -108,13 +126,9 @@ class DotLine {
 
     handleMouseUp(e) {
         if(!this.isDrawing) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
+        const coords = this.getEventCoordinates(e);
         const endPoint = this.points.find(p => 
-            Math.hypot(p.x - x, p.y - y) < 10 && 
+            Math.hypot(p.x - coords.x, p.y - coords.y) < 10 && 
             !p.isDead
         );
 
@@ -185,6 +199,21 @@ class DotLine {
         this.selectedPoint = null;
         this.currentPath = [];
         this.draw();
+    }
+
+    handleTouchStart(e) {
+        e.preventDefault();
+        this.handleMouseDown(e);
+    }
+
+    handleTouchMove(e) {
+        e.preventDefault();
+        this.handleMouseMove(e);
+    }
+
+    handleTouchEnd(e) {
+        e.preventDefault();
+        this.handleMouseUp(e);
     }
 
     canConnect(p1, p2) {

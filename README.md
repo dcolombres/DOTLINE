@@ -1,20 +1,20 @@
 # DOTLINE
 
-A simple multiplayer game where players take turns connecting dots to create lines and score points.
+Un simple juego multijugador donde los jugadores se turnan para conectar puntos, crear líneas y sumar puntos.
 
-## How to Play
+## Cómo Jugar
 
-1.  Open the `DOTLINE.html` file in a web browser.
-2.  Select the number of players and initial points.
-3.  Click "New Game" to start.
-4.  Players take turns clicking and dragging between dots to create lines.
-5.  Each line drawn gives the player a point.
-6.  A dot is "dead" and can no longer be used once it has 3 connections.
-7.  The game ends when no more moves are possible.
-8.  The player with the most points wins.
+1.  Abre el archivo `index.html` en un navegador web.
+2.  Selecciona el número de jugadores y los puntos iniciales.
+3.  Haz clic en "Nuevo Juego" para comenzar.
+4.  Los jugadores se turnan para hacer clic y arrastrar el cursor entre los puntos para crear líneas.
+5.  Cada línea dibujada otorga un punto al jugador.
+6.  Un punto se considera "muerto" y no puede usarse más una vez que alcanza 3 conexiones.
+7.  El juego termina cuando no quedan movimientos posibles.
+8.  El jugador con la mayor cantidad de puntos gana.
 
-## Technologies Used
+## Tecnologías Utilizadas
 
-*   HTML
-*   CSS
-*   JavaScript
+*   HTML5
+*   CSS3
+*   JavaScript (ES6+)
