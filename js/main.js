@@ -76,6 +76,7 @@ class DotLine {
         this.isAiTurn = false;
         this.gameReady = false;
         this.currentPath = [];
+        this.snapTarget = null;
 
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -128,12 +129,18 @@ class DotLine {
         }
 
         // Draw current path
-        if (this.isDrawing && this.currentPath.length > 1 && this.players.length > 0) {
+        if (this.isDrawing && this.currentPath.length > 0 && this.players.length > 0) {
             this.ctx.beginPath();
             this.ctx.moveTo(this.currentPath[0].x, this.currentPath[0].y);
             for(let i = 1; i < this.currentPath.length; i++) {
                 this.ctx.lineTo(this.currentPath[i].x, this.currentPath[i].y);
             }
+            
+            if (this.snapTarget) {
+                const lastPoint = this.currentPath[this.currentPath.length - 1];
+                this.ctx.lineTo(this.snapTarget.x, this.snapTarget.y);
+            }
+
             this.ctx.strokeStyle = this.players[this.currentPlayer].color;
             this.ctx.lineWidth = 2;
             this.ctx.stroke();
@@ -353,15 +360,29 @@ class DotLine {
         if(!this.isDrawing || !this.selectedPoint) return;
         const coords = this.getEventCoordinates(e);
         this.currentPath.push({x: coords.x, y: coords.y});
+
+        // Snap to point logic
+        const snapRadius = 20;
+        let snapPoint = null;
+        for (const point of this.points) {
+            if (point !== this.selectedPoint && !point.isDead) {
+                const dist = Math.hypot(point.x - coords.x, point.y - coords.y);
+                if (dist < snapRadius) {
+                    snapPoint = point;
+                    break;
+                }
+            }
+        }
+        this.snapTarget = snapPoint;
     }
 
     handleMouseUp(e) {
         if(!this.isDrawing) return;
-        const coords = this.getEventCoordinates(e);
-        const endPoint = this.points.find(p => 
-            Math.hypot(p.x - coords.x, p.y - coords.y) < 10 && 
-            !p.isDead
-        );
+
+        const endPoint = this.snapTarget || this.points.find(p => {
+            const coords = this.getEventCoordinates(e);
+            return Math.hypot(p.x - coords.x, p.y - coords.y) < 10 && !p.isDead;
+        });
 
         if (this.executeMove(this.selectedPoint, endPoint)) {
             this.nextTurn();
@@ -370,6 +391,7 @@ class DotLine {
         this.isDrawing = false;
         this.selectedPoint = null;
         this.currentPath = [];
+        this.snapTarget = null; // Reset snapTarget
     }
 
     executeMove(startPoint, endPoint) {
@@ -575,16 +597,25 @@ class DotLine {
         if (this.gameMode === 'pve_easy') {
             chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
         } else if (this.gameMode === 'pve_hard') {
-            const safeMoves = validMoves.filter(move => {
-                const p1_isSafe = move.p1.connections !== 1;
-                const p2_isSafe = move.p2.connections !== 1;
-                return p1_isSafe && p2_isSafe;
+            // 1. Look for winning moves (that close a point)
+            const winningMoves = validMoves.filter(move => {
+                return move.p1.connections === 2 || move.p2.connections === 2;
             });
 
-            if (safeMoves.length > 0) {
-                chosenMove = safeMoves[Math.floor(Math.random() * safeMoves.length)];
+            if (winningMoves.length > 0) {
+                chosenMove = winningMoves[Math.floor(Math.random() * winningMoves.length)];
             } else {
-                chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                // 2. Look for safe moves (that don't set up the opponent)
+                const safeMoves = validMoves.filter(move => {
+                    return move.p1.connections !== 1 && move.p2.connections !== 1;
+                });
+
+                if (safeMoves.length > 0) {
+                    chosenMove = safeMoves[Math.floor(Math.random() * safeMoves.length)];
+                } else {
+                    // 3. Make a random move
+                    chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                }
             }
         }
 
@@ -592,9 +623,10 @@ class DotLine {
             this.currentPath = [chosenMove.p1, chosenMove.p2];
             if (this.executeMove(chosenMove.p1, chosenMove.p2)) {
                 this.nextTurn();
-            } else {
-                this.makeAiMove();
             }
+        } else {
+            // Should not happen, but as a fallback, pass the turn
+            this.nextTurn();
         }
     }
 
@@ -638,6 +670,33 @@ class DotLine {
             }
         }
         return validMoves;
+    }
+
+    cloneState() {
+        // This is a placeholder for a deep clone of the game state
+        return JSON.parse(JSON.stringify(this));
+    }
+
+    evaluateState() {
+        const aiPlayerIndex = this.players.findIndex(p => p.isAi);
+        const humanPlayerIndex = this.players.findIndex(p => !p.isAi);
+
+        if (this.gameOver) {
+            if (this.players[aiPlayerIndex].score > this.players[humanPlayerIndex].score) {
+                return 100; // AI wins
+            } else if (this.players[humanPlayerIndex].score > this.players[aiPlayerIndex].score) {
+                return -100; // Human wins
+            } else {
+                return 0; // Draw
+            }
+        }
+
+        return this.players[aiPlayerIndex].score - this.players[humanPlayerIndex].score;
+    }
+
+    minimax(state, depth, maximizingPlayer) {
+        // Placeholder for the minimax algorithm
+        return 0;
     }
 }
 
