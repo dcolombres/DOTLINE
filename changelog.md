@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.8.0 - Pulido Final y Estabilidad
+- Eliminada la mecánica de "créditos de loop" y la posibilidad de hacer loops para simplificar las reglas.
+- Rediseñada la configuración de partida a una pantalla modal para una mejor experiencia de usuario.
+- Cambiado el input de puntos iniciales a botones (3, 4, 5).
+- Mejorada y simplificada la adaptabilidad en dispositivos móviles.
+- Añadidos efectos de sonido para las acciones principales del juego.
+- Corregido un bug crítico que impedía cerrar líneas en dispositivos táctiles.
+- Solucionados de forma definitiva los bugs de "Game Over" prematuro y de poder jugar en el turno de la IA.
+
 ## v0.7.0 - Estabilidad y Correcciones
 - Corregidos múltiples bugs críticos que impedían el inicio correcto del juego ("jugada fantasma" y errores de sintaxis).
 - Solucionados varios bugs relacionados con la detección incorrecta del "Game Over".

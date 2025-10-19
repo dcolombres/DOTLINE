@@ -1,3 +1,56 @@
+class AudioManager {
+    constructor() {
+        this.audioCtx = null;
+    }
+
+    init() {
+        if (!this.audioCtx) {
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    playSound(soundType) {
+        if (!this.audioCtx) return;
+
+        const oscillator = this.audioCtx.createOscillator();
+        const gainNode = this.audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioCtx.destination);
+
+        switch (soundType) {
+            case 'click':
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(880, this.audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, this.audioCtx.currentTime + 0.1);
+                break;
+            case 'score':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(523.25, this.audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.2, this.audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(1046.50, this.audioCtx.currentTime + 0.1);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, this.audioCtx.currentTime + 0.2);
+                break;
+            case 'invalid':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(110, this.audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, this.audioCtx.currentTime + 0.2);
+                break;
+            case 'gameOver':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(16.35, this.audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(200, this.audioCtx.currentTime + 1);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, this.audioCtx.currentTime + 1);
+                break;
+        }
+
+        oscillator.start(this.audioCtx.currentTime);
+        oscillator.stop(this.audioCtx.currentTime + 1);
+    }
+}
+
 class Point {
     constructor(x, y, initialConnections = 0) {
         this.x = x;
@@ -9,6 +62,7 @@ class Point {
 
 class DotLine {
     constructor(canvas) {
+        this.audioManager = new AudioManager();
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.points = [];
@@ -216,7 +270,11 @@ class DotLine {
             });
         }
 
+        // Randomly select the starting player
+        this.currentPlayer = Math.floor(Math.random() * this.players.length);
+
         this.logMessage(`Nueva partida iniciada con ${playerCount} jugadores.`);
+        this.logMessage(`Es el turno de ${this.getPlayerName(this.currentPlayer)}.`, this.players[this.currentPlayer].color);
 
         for(let i = 0; i < initialPoints; i++) {
             this.points.push(new Point(
@@ -229,6 +287,12 @@ class DotLine {
         this.resizeCanvas();
         this.render();
         this.gameReady = true;
+
+        // If the first player is an AI, trigger its turn
+        if (this.players[this.currentPlayer].isAi) {
+            this.isAiTurn = true;
+            setTimeout(() => this.makeAiMove(), 1000);
+        }
     }
 
     updatePlayerInfo() {
@@ -249,12 +313,20 @@ class DotLine {
 
     getEventCoordinates(e) {
         const rect = this.canvas.getBoundingClientRect();
-        if (e.touches) {
+        let touch;
+        if (e.touches && e.touches.length > 0) {
+            touch = e.touches[0];
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+            touch = e.changedTouches[0];
+        }
+
+        if (touch) {
             return {
-                x: e.touches[0].clientX - rect.left,
-                y: e.touches[0].clientY - rect.top
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top
             };
         }
+        
         return {
             x: e.clientX - rect.left,
             y: e.clientY - rect.top
@@ -262,6 +334,8 @@ class DotLine {
     }
 
     handleMouseDown(e) {
+        this.audioManager.init();
+        this.audioManager.playSound('click');
         if (!this.gameReady || this.gameOver || this.isAiTurn) return;
         const coords = this.getEventCoordinates(e);
         const clickedPoint = this.points.find(p => 
@@ -307,11 +381,10 @@ class DotLine {
                         const segmentStart = line.path[k];
                         const segmentEnd = line.path[k+1];
 
-                        // Ignore segments that are very close to the start point of the new line
                         const dist1 = Math.hypot(startPoint.x - segmentStart.x, startPoint.y - segmentStart.y);
                         const dist2 = Math.hypot(startPoint.x - segmentEnd.x, startPoint.y - segmentEnd.y);
                         if (dist1 < 10 || dist2 < 10) {
-                            continue; // Skip this segment
+                            continue;
                         }
 
                         if (this.linesIntersect(startPoint, endPoint, segmentStart, segmentEnd)) {
@@ -369,16 +442,19 @@ class DotLine {
 
                     this.points.push(newPoint);
                     this.players[this.currentPlayer].score++;
+                    this.audioManager.playSound('score');
                     this.logMessage(`${this.getPlayerName(this.currentPlayer)} anotó un punto!`, this.players[this.currentPlayer].color);
                     return true;
                 }
             } else {
                 this.triggerInvalidMoveAnimation();
+                this.audioManager.playSound('invalid');
                 this.logMessage('Movimiento inválido: Las líneas no pueden cruzarse.', '#ff6b6b');
                 return false;
             }
         } else if (this.isDrawing) {
             this.triggerInvalidMoveAnimation();
+            this.audioManager.playSound('invalid');
             this.logMessage('Movimiento inválido.', '#ff6b6b');
             return false;
         }
@@ -402,7 +478,7 @@ class DotLine {
 
     canConnect(p1, p2) {
         if(p1.isDead || p2.isDead) return false;
-        if(p1 === p2) return false; // Disallow self-connection
+        if(p1 === p2) return false;
         return p1.connections < 3 && p2.connections < 3;
     }
 
@@ -468,6 +544,7 @@ class DotLine {
         
         this.gameOver = !this.hasValidMoves();
         if(this.gameOver) {
+            this.audioManager.playSound('gameOver');
             const winner = this.players.reduce((prev, curr, idx) => 
                 curr.score > prev.score ? {score: curr.score, index: idx} : prev,
                 {score: -1, index: -1}
@@ -515,6 +592,8 @@ class DotLine {
             this.currentPath = [chosenMove.p1, chosenMove.p2];
             if (this.executeMove(chosenMove.p1, chosenMove.p2)) {
                 this.nextTurn();
+            } else {
+                this.makeAiMove();
             }
         }
     }
@@ -534,11 +613,10 @@ class DotLine {
                                 const segmentStart = line.path[k];
                                 const segmentEnd = line.path[k+1];
 
-                                // Ignore segments that are very close to the start point of the new line
                                 const dist1 = Math.hypot(p1.x - segmentStart.x, p1.y - segmentStart.y);
                                 const dist2 = Math.hypot(p1.x - segmentEnd.x, p1.y - segmentEnd.y);
                                 if (dist1 < 10 || dist2 < 10) {
-                                    continue; // Skip this segment
+                                    continue;
                                 }
 
                                 if (this.linesIntersect(p1, p2, segmentStart, segmentEnd)) {
@@ -548,7 +626,6 @@ class DotLine {
                             }
                         } else {
                             if (this.linesIntersect(p1, p2, line.p1, line.p2)) {
-                                this.logMessage(`DEBUG: Intersection discarded move (${p1.x.toFixed(2)},${p1.y.toFixed(2)}) [${p1.connections}] -> (${p2.x.toFixed(2)},${p2.y.toFixed(2)}) [${p2.connections}]`, '#f0f');
                                 intersects = true;
                             }
                         }
@@ -572,31 +649,54 @@ const gameModeSelect = document.getElementById('gameMode');
 const playerCountInput = document.getElementById('playerCount');
 const playerNameContainer = document.getElementById('playerNameContainer');
 const playerCountContainer = document.getElementById('playerCountContainer');
+const initialPointsGroup = document.getElementById('initialPoints');
+const newGameBtn = document.getElementById('newGameBtn');
+const startGameBtn = document.getElementById('startGameBtn');
+const modal = document.getElementById('setup-modal');
 
 function startGame() {
     const consoleElement = document.getElementById('message-console');
     consoleElement.innerHTML = '';
 
     const playerCount = parseInt(playerCountInput.value);
-    const initialPoints = parseInt(document.getElementById('initialPoints').value);
+    const initialPoints = parseInt(initialPointsGroup.querySelector('.active').dataset.points);
+    
     game.initGame(playerCount, initialPoints);
 }
 
-document.getElementById('newGame').addEventListener('click', startGame);
+newGameBtn.addEventListener('click', () => {
+    modal.style.display = 'flex';
+});
+
+startGameBtn.addEventListener('click', () => {
+    modal.style.display = 'none';
+    startGame();
+});
+
+initialPointsGroup.addEventListener('click', (e) => {
+    if (e.target.classList.contains('point-button')) {
+        game.logMessage('DEBUG: Point button clicked.', '#f0f');
+        initialPointsGroup.querySelectorAll('.point-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        e.target.classList.add('active');
+    }
+});
 
 gameModeSelect.addEventListener('change', () => {
     if (gameModeSelect.value !== 'pvp') {
         playerCountInput.value = 2;
-        playerCountInput.disabled = true;
-        playerNameContainer.style.display = 'flex';
         playerCountContainer.style.display = 'none';
+        playerNameContainer.style.display = 'flex';
     } else {
-        playerCountInput.disabled = false;
-        playerNameContainer.style.display = 'none';
         playerCountContainer.style.display = 'flex';
+        playerNameContainer.style.display = 'none';
     }
 });
 
-// Initial setup
-gameModeSelect.dispatchEvent(new Event('change'));
-startGame();
+// Initial Page Load
+function initialize() {
+    gameModeSelect.dispatchEvent(new Event('change'));
+}
+
+initialize();
